@@ -347,17 +347,12 @@ function cleanUrl(value) {
   let text = cleanText(value);
   if (!text) return { ok: true, url: '' };
   if (text.length > 300) return { ok: false, error: 'URLは300文字以内にしてください。' };
-  if (!/^[a-z][a-z0-9+.-]*:/i.test(text)) text = 'https://' + text;
-  let parsed;
-  try {
-    parsed = new URL(text);
-  } catch (error) {
-    return { ok: false, error: 'URLの形式を確認してください。' };
-  }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(text) && !/^https?:\/\//i.test(text)) {
     return { ok: false, error: 'http か https のURLにしてください。' };
   }
-  return { ok: true, url: parsed.href };
+  if (!/^https?:\/\//i.test(text)) text = 'https://' + text;
+  if (!/^https?:\/\/[^\s<>"']+$/i.test(text)) return { ok: false, error: 'URLの形式を確認してください。' };
+  return { ok: true, url: text };
 }
 
 function cleanEvent(input) {
