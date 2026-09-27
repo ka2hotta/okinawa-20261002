@@ -141,6 +141,19 @@
     .event .title { display: block; font-weight: 680; overflow-wrap: anywhere; }
     .event .meta { display: block; color: var(--muted); overflow-wrap: anywhere; }
     .event a { color: var(--c, #111); }
+    .event a.open-url {
+      display: inline-block;
+      margin-top: 3px;
+      padding: 2px 9px;
+      border-radius: 999px;
+      background: var(--c, #111);
+      color: #fff;
+      text-decoration: none;
+      font-size: 11px;
+      font-weight: 680;
+      line-height: 1.5;
+    }
+    .event.span a.open-url { margin-top: 0; vertical-align: 1px; }
     .event.span {
       z-index: 3;
       white-space: nowrap;
@@ -238,7 +251,7 @@
     }
   </style>
 </head>
-<body data-build="2026-09-27-okinawa-5">
+<body data-build="2026-09-27-okinawa-6">
   <main class="app">
   <header>
     <div>
@@ -282,6 +295,8 @@
     <input id="title" name="title" type="text" maxlength="80" required>
     <label for="place">場所</label>
     <input id="place" name="place" type="text" maxlength="80">
+    <label for="url">URL</label>
+    <input id="url" name="url" type="text" inputmode="url" maxlength="300" placeholder="https://">
     <label for="memo">メモ</label>
     <textarea id="memo" name="memo" maxlength="200"></textarea>
     <div class="form-actions">
@@ -328,6 +343,23 @@ function cleanText(value) {
   return String(value || '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').trim();
 }
 
+function cleanUrl(value) {
+  let text = cleanText(value);
+  if (!text) return { ok: true, url: '' };
+  if (text.length > 300) return { ok: false, error: 'URLは300文字以内にしてください。' };
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(text)) text = 'https://' + text;
+  let parsed;
+  try {
+    parsed = new URL(text);
+  } catch (error) {
+    return { ok: false, error: 'URLの形式を確認してください。' };
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { ok: false, error: 'http か https のURLにしてください。' };
+  }
+  return { ok: true, url: parsed.href };
+}
+
 function cleanEvent(input) {
   const source = input && typeof input === 'object' ? input : {};
   const lane = String(source.lane || '');
@@ -335,6 +367,7 @@ function cleanEvent(input) {
   const title = cleanText(source.title);
   const place = cleanText(source.place);
   const memo = cleanText(source.memo);
+  const url = cleanUrl(source.url);
   const startMin = toMinutes(source.start);
   const endMin = toMinutes(source.end);
   const id = String(source.id || '');
@@ -344,6 +377,7 @@ function cleanEvent(input) {
   if (title.length > 80) return { ok: false, error: 'タイトルは80文字以内にしてください。' };
   if (place.length > 80) return { ok: false, error: '場所は80文字以内にしてください。' };
   if (memo.length > 200) return { ok: false, error: 'メモは200文字以内にしてください。' };
+  if (!url.ok) return url;
   if (startMin == null || endMin == null) return { ok: false, error: '時刻を入力してください。' };
   if (endMin <= startMin) return { ok: false, error: '終了は開始より後にしてください。' };
   if (id && !/^[0-9a-f]{32}$/i.test(id)) return { ok: false, error: '予定の指定が正しくありません。' };
@@ -357,7 +391,8 @@ function cleanEvent(input) {
       end: minutesToTime(endMin),
       title: title,
       place: place,
-      memo: memo
+      memo: memo,
+      url: url.url
     }
   };
 }
@@ -425,6 +460,7 @@ function layoutLane(events) {
     title: event.title,
     place: event.place,
     memo: event.memo,
+    url: event.url,
     startMin: toMinutes(event.start),
     endMin: toMinutes(event.end)
   })).filter((event) => event.startMin != null && event.endMin != null && event.endMin > event.startMin);
@@ -565,7 +601,8 @@ function blankEvent() {
     end: times.end,
     title: '',
     place: '',
-    memo: ''
+    memo: '',
+    url: ''
   };
 }
 
@@ -713,7 +750,7 @@ function renderEvent(event, axis, span) {
   card.tabIndex = 0;
   const width = 100 / event.cols;
   card.style.top = box.top + 'px';
-  card.style.height = Math.max(box.height - 2, 18) + 'px';
+  card.style.height = Math.max(box.height - 2, event.url ? 46 : 18) + 'px';
   if (span && event.cols === 1) {
     card.style.left = '2px';
     card.style.right = '2px';
@@ -733,6 +770,15 @@ function renderEvent(event, axis, span) {
   title.className = 'title';
   title.textContent = event.title;
   card.appendChild(title);
+  if (event.url) {
+    const open = document.createElement('a');
+    open.className = 'open-url';
+    open.href = event.url;
+    open.target = '_blank';
+    open.rel = 'noopener noreferrer';
+    open.textContent = '開く';
+    card.appendChild(open);
+  }
   const details = eventDetails(box.height);
   if (details.time) {
     const time = document.createElement('span');
@@ -798,6 +844,7 @@ function openEditor(event) {
   document.getElementById('end').value = event.end;
   document.getElementById('title').value = event.title || '';
   document.getElementById('place').value = event.place || '';
+  document.getElementById('url').value = event.url || '';
   document.getElementById('memo').value = event.memo || '';
   document.getElementById('remove').hidden = !event.id;
   document.getElementById('editor').hidden = false;
@@ -828,6 +875,7 @@ function readForm() {
     end: document.getElementById('end').value,
     title: document.getElementById('title').value,
     place: document.getElementById('place').value,
+    url: document.getElementById('url').value,
     memo: document.getElementById('memo').value
   };
 }
@@ -994,7 +1042,8 @@ function copyEvent(event) {
     end: event.end,
     title: event.title,
     place: event.place,
-    memo: event.memo
+    memo: event.memo,
+    url: event.url || ''
   };
 }
 
