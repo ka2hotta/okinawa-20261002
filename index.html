@@ -37,8 +37,8 @@
     #status.error { color: #a31616; }
     .empty-day { margin: 8px 0; font-size: 14px; color: var(--muted); }
     .board-scroll { overflow-x: auto; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-    .board { min-width: 340px; --hour: 52px; --rows: 18; }
-    .head, .body { display: grid; grid-template-columns: 44px repeat(4, minmax(72px, 1fr)); }
+    .board { min-width: 320px; --hour: 52px; --rows: 18; }
+    .head, .body { display: grid; grid-template-columns: 44px repeat(3, minmax(88px, 1fr)); }
     .corner, .lane-head { position: sticky; top: 0; background: #fff; z-index: 3; }
     .corner { left: 0; z-index: 4; }
     .lane-head {
@@ -52,8 +52,8 @@
     }
     .time-col { position: sticky; left: 0; background: #fff; z-index: 2; }
     .hour { height: var(--hour); padding: 2px 0 0 4px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
-    .lanes-wrap { grid-column: 2 / 6; position: relative; }
-    .lanes { display: grid; grid-template-columns: repeat(4, minmax(72px, 1fr)); }
+    .lanes-wrap { grid-column: 2 / 5; position: relative; }
+    .lanes { display: grid; grid-template-columns: repeat(3, minmax(88px, 1fr)); }
     .lane {
       position: relative;
       height: calc(var(--rows) * var(--hour));
@@ -77,6 +77,11 @@
     .event .title { display: block; font-weight: 650; overflow-wrap: anywhere; }
     .event .meta { display: block; color: var(--muted); overflow-wrap: anywhere; }
     .event a { color: var(--c, #111); }
+    .event.span { z-index: 3; white-space: nowrap; }
+    .event.span .tag,
+    .event.span .title,
+    .event.span .meta { display: inline; margin-right: 8px; }
+    .event.span .tag { font-weight: 650; color: var(--c, #111); }
     .now-line { position: absolute; left: 0; right: 0; border-top: 2px solid #c81e1e; z-index: 5; pointer-events: none; }
     .now-label {
       position: absolute;
@@ -121,7 +126,7 @@
     footer { padding-top: 4px; padding-bottom: 8px; }
   </style>
 </head>
-<body data-build="2026-09-27-okinawa-3">
+<body data-build="2026-09-27-okinawa-4">
   <header>
     <h1>沖縄旅行</h1>
     <p class="lead">2026年10月2日（金）– 10月4日（日）・2泊3日</p>
@@ -139,7 +144,7 @@
       <select id="lane" name="lane" required></select>
       <span id="lane-swatch" class="swatch" hidden></span>
     </div>
-    <p class="help">全員は、3家族が一緒にいる予定です。</p>
+    <p class="help">全員を選ぶと、3列を横断する帯になります。</p>
     <label for="date">日付</label>
     <select id="date" name="date" required></select>
     <div class="row2">
@@ -174,6 +179,10 @@ const LANES = [
   { id: 'hasegawa', name: '長谷川' },
   { id: 'all', name: '全員' }
 ];
+
+function columnLanes() {
+  return LANES.filter((lane) => lane.id !== 'all');
+}
 const DATES = ['2026-10-02', '2026-10-03', '2026-10-04'];
 const DAY_START = 6 * 60;
 const DAY_END = 24 * 60;
@@ -507,7 +516,7 @@ function renderBoard() {
   const head = document.createElement('div');
   head.className = 'head';
   head.appendChild(document.createElement('div')).className = 'corner';
-  for (const lane of LANES) {
+  for (const lane of columnLanes()) {
     const cell = document.createElement('div');
     cell.className = 'lane-head ' + lane.id;
     const swatch = document.createElement('span');
@@ -540,14 +549,16 @@ function renderBoard() {
   lanesWrap.className = 'lanes-wrap';
   const lanes = document.createElement('div');
   lanes.className = 'lanes';
-  for (const lane of LANES) {
+  for (const lane of columnLanes()) {
     const column = document.createElement('div');
     column.className = 'lane';
     const placed = layoutLane(dayEvents.filter((event) => event.lane === lane.id));
-    for (const event of placed) column.appendChild(renderEvent(event, axis));
+    for (const event of placed) column.appendChild(renderEvent(event, axis, false));
     lanes.appendChild(column);
   }
   lanesWrap.appendChild(lanes);
+  const spanned = layoutLane(dayEvents.filter((event) => event.lane === 'all'));
+  for (const event of spanned) lanesWrap.appendChild(renderEvent(event, axis, true));
   if (nowTop != null) {
     const line = document.createElement('div');
     line.className = 'now-line';
@@ -571,19 +582,31 @@ function renderBoard() {
   if (nowTop != null) maybeScrollToNow();
 }
 
-function renderEvent(event, axis) {
+function renderEvent(event, axis, span) {
   const box = eventBox(event.startMin, event.endMin, axis, HOUR_PX);
   const card = document.createElement('div');
-  card.className = 'event ' + event.lane;
+  card.className = 'event ' + event.lane + (span ? ' span' : '');
   card.dataset.id = event.id;
   card.setAttribute('role', 'button');
   card.tabIndex = 0;
   const width = 100 / event.cols;
   card.style.top = box.top + 'px';
   card.style.height = Math.max(box.height - 2, 18) + 'px';
-  card.style.left = 'calc(' + width * event.col + '% + 2px)';
-  card.style.width = 'calc(' + width + '% - 4px)';
+  if (span && event.cols === 1) {
+    card.style.left = '2px';
+    card.style.right = '2px';
+    card.style.width = 'auto';
+  } else {
+    card.style.left = 'calc(' + width * event.col + '% + 2px)';
+    card.style.width = 'calc(' + width + '% - 4px)';
+  }
 
+  if (span) {
+    const tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.textContent = '全員';
+    card.appendChild(tag);
+  }
   const title = document.createElement('span');
   title.className = 'title';
   title.textContent = event.title;
