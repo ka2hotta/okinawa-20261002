@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="googlebot" content="noindex, nofollow">
+  <title>沖縄旅行 10/2–10/4</title>
+  <style>
+    :root { color-scheme: light; --line: #e6e6e6; --ink: #1a1a1a; --muted: #5c5c5c; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #fff;
+      color: var(--ink);
+      font-family: system-ui, "Segoe UI", "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
+      font-size: 15px;
+      line-height: 1.45;
+      padding-bottom: calc(72px + env(safe-area-inset-bottom));
+    }
+    header, .toolbar, #hint, #status, #editor, footer, .empty-day { padding-left: 16px; padding-right: 16px; }
+    h1 { margin: 16px 0 4px; font-size: 20px; line-height: 1.3; font-weight: 650; }
+    h2 { margin: 12px 0 0; font-size: 16px; font-weight: 650; }
+    .lead { margin: 0; color: var(--muted); font-size: 14px; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 12px; padding-bottom: 8px; }
+    button, input, select, textarea { font: inherit; }
+    .toolbar button, .text-btn, .form-actions button {
+      background: #fff;
+      color: var(--ink);
+      border: 1px solid #c8c8c8;
+      padding: 8px 10px;
+      cursor: pointer;
+    }
+    .toolbar button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+    #hint { margin: 0 0 8px; font-size: 14px; }
+    #status { min-height: 1.2em; margin: 4px 0 8px; font-size: 13px; color: var(--muted); }
+    #status.error { color: #a31616; }
+    .empty-day { margin: 8px 0; font-size: 14px; color: var(--muted); }
+    .board-scroll { overflow-x: auto; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .board { min-width: 340px; --hour: 52px; --rows: 18; }
+    .head, .body { display: grid; grid-template-columns: 44px repeat(4, minmax(72px, 1fr)); }
+    .corner, .lane-head { position: sticky; top: 0; background: #fff; z-index: 3; }
+    .corner { left: 0; z-index: 4; }
+    .lane-head {
+      padding: 8px 6px;
+      font-size: 14px;
+      font-weight: 650;
+      border-left: 1px solid var(--line);
+      border-top: 4px solid var(--c, #111);
+      border-bottom: 1px solid var(--line);
+      white-space: nowrap;
+    }
+    .time-col { position: sticky; left: 0; background: #fff; z-index: 2; }
+    .hour { height: var(--hour); padding: 2px 0 0 4px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .lanes-wrap { grid-column: 2 / 6; position: relative; }
+    .lanes { display: grid; grid-template-columns: repeat(4, minmax(72px, 1fr)); }
+    .lane {
+      position: relative;
+      height: calc(var(--rows) * var(--hour));
+      border-left: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      background-image: linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+      background-size: 100% var(--hour);
+    }
+    .event {
+      position: absolute;
+      overflow: hidden;
+      padding: 2px 4px;
+      text-align: left;
+      font-size: 12px;
+      line-height: 1.3;
+      color: var(--ink);
+      background: var(--bg, #f4f4f4);
+      border-left: 3px solid var(--c, #111);
+      cursor: pointer;
+    }
+    .event .title { display: block; font-weight: 650; overflow-wrap: anywhere; }
+    .event .meta { display: block; color: var(--muted); overflow-wrap: anywhere; }
+    .event a { color: var(--c, #111); }
+    .now-line { position: absolute; left: 0; right: 0; border-top: 2px solid #c81e1e; z-index: 5; pointer-events: none; }
+    .now-label {
+      position: absolute;
+      left: 2px;
+      z-index: 6;
+      padding: 0 3px;
+      background: #c81e1e;
+      color: #fff;
+      font-size: 11px;
+      line-height: 16px;
+      font-variant-numeric: tabular-nums;
+    }
+    .hotta { --c: #2f6fed; --bg: #e7f0ff; }
+    .yamaguchi { --c: #1f9d55; --bg: #e5f6ec; }
+    .hasegawa { --c: #e07a1f; --bg: #fff1e4; }
+    .all { --c: #7a3ff2; --bg: #f3e9ff; }
+    .swatch { display: inline-block; width: 10px; height: 10px; margin-right: 4px; background: var(--c, transparent); vertical-align: -1px; }
+    #add {
+      position: fixed;
+      left: 16px;
+      right: 16px;
+      bottom: calc(12px + env(safe-area-inset-bottom));
+      height: 44px;
+      background: var(--ink);
+      color: #fff;
+      border: 0;
+      cursor: pointer;
+    }
+    #editor { max-width: 520px; }
+    #editor[hidden], #add[hidden], #hint[hidden], #empty[hidden], #remove[hidden] { display: none; }
+    label { display: block; margin: 10px 0 4px; font-size: 13px; }
+    input, select, textarea { width: 100%; padding: 8px; border: 1px solid #c8c8c8; background: #fff; color: var(--ink); }
+    textarea { min-height: 72px; resize: vertical; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .lane-line { display: flex; align-items: center; gap: 8px; }
+    .lane-line select { flex: 1; }
+    .form-actions { display: flex; gap: 8px; margin: 12px 0 20px; }
+    .form-actions .primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .form-actions .danger { color: #a31616; }
+    .help, footer { font-size: 12px; color: var(--muted); }
+    .help { margin: 8px 0 0; }
+    footer { padding-top: 4px; padding-bottom: 8px; }
+  </style>
+</head>
+<body data-build="2026-09-27-okinawa-3">
+  <header>
+    <h1>沖縄旅行</h1>
+    <p class="lead">2026年10月2日（金）– 10月4日（日）・2泊3日</p>
+    <p class="lead">堀田・山口・長谷川</p>
+  </header>
+  <nav id="days" class="toolbar" aria-label="日付"></nav>
+  <p id="hint" hidden></p>
+  <p id="status" role="status"></p>
+  <p id="empty" class="empty-day" hidden></p>
+  <div id="board" aria-label="スケジュール"></div>
+  <form id="editor" hidden autocomplete="off">
+    <h2 id="editor-title">予定を追加</h2>
+    <label for="lane">区分</label>
+    <div class="lane-line">
+      <select id="lane" name="lane" required></select>
+      <span id="lane-swatch" class="swatch" hidden></span>
+    </div>
+    <p class="help">全員は、3家族が一緒にいる予定です。</p>
+    <label for="date">日付</label>
+    <select id="date" name="date" required></select>
+    <div class="row2">
+      <div>
+        <label for="start">開始</label>
+        <input id="start" name="start" type="time" required>
+      </div>
+      <div>
+        <label for="end">終了</label>
+        <input id="end" name="end" type="time" required>
+      </div>
+    </div>
+    <label for="title">タイトル</label>
+    <input id="title" name="title" type="text" maxlength="80" required>
+    <label for="place">場所</label>
+    <input id="place" name="place" type="text" maxlength="80">
+    <label for="memo">メモ</label>
+    <textarea id="memo" name="memo" maxlength="200"></textarea>
+    <div class="form-actions">
+      <button class="primary" type="submit">保存</button>
+      <button id="cancel" type="button">キャンセル</button>
+      <button id="remove" class="danger" type="button" hidden>削除</button>
+    </div>
+  </form>
+  <button id="add" type="button">予定を追加</button>
+  <footer>リンクを知っている人は予定を追加・削除できます。</footer>
+  <script>
+window.ENDPOINT = "https://script.google.com/macros/s/AKfycbwdxU9hucV6nHXoJD2gLu6wWxGwQQb70XC7hIWwGYVYpWMUIvgYQ2BrACTz3EJ67cDsFQ/exec";
+const LANES = [
+  { id: 'hotta', name: '堀田' },
+  { id: 'yamaguchi', name: '山口' },
+  { id: 'hasegawa', name: '長谷川' },
+  { id: 'all', name: '全員' }
+];
+const DATES = ['2026-10-02', '2026-10-03', '2026-10-04'];
+const DAY_START = 6 * 60;
+const DAY_END = 24 * 60;
+const HOUR_PX = 52;
+
+function pad2(value) {
+  return String(value).padStart(2, '0');
+}
+
+function toMinutes(value) {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/.exec(String(value || ''));
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function minutesToTime(minutes) {
+  return pad2(Math.floor(minutes / 60)) + ':' + pad2(minutes % 60);
+}
+
+function cleanText(value) {
+  return String(value || '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').trim();
+}
+
+function cleanEvent(input) {
+  const source = input && typeof input === 'object' ? input : {};
+  const lane = String(source.lane || '');
+  const date = String(source.date || '');
+  const title = cleanText(source.title);
+  const place = cleanText(source.place);
+  const memo = cleanText(source.memo);
+  const startMin = toMinutes(source.start);
+  const endMin = toMinutes(source.end);
+  const id = String(source.id || '');
+  if (!LANES.some((item) => item.id === lane)) return { ok: false, error: '区分を選んでください。' };
+  if (!DATES.includes(date)) return { ok: false, error: '日付が範囲外です。' };
+  if (!title) return { ok: false, error: 'タイトルを入力してください。' };
+  if (title.length > 80) return { ok: false, error: 'タイトルは80文字以内にしてください。' };
+  if (place.length > 80) return { ok: false, error: '場所は80文字以内にしてください。' };
+  if (memo.length > 200) return { ok: false, error: 'メモは200文字以内にしてください。' };
+  if (startMin == null || endMin == null) return { ok: false, error: '時刻を入力してください。' };
+  if (endMin <= startMin) return { ok: false, error: '終了は開始より後にしてください。' };
+  if (id && !/^[0-9a-f]{32}$/i.test(id)) return { ok: false, error: '予定の指定が正しくありません。' };
+  return {
+    ok: true,
+    event: {
+      id: id,
+      lane: lane,
+      date: date,
+      start: minutesToTime(startMin),
+      end: minutesToTime(endMin),
+      title: title,
+      place: place,
+      memo: memo
+    }
+  };
+}
+
+function axisRange(events, nowMinutes) {
+  let start = DAY_START;
+  let end = DAY_END;
+  const list = Array.isArray(events) ? events : [];
+  for (const event of list) {
+    const startMin = toMinutes(event.start);
+    const endMin = toMinutes(event.end);
+    if (startMin == null || endMin == null) continue;
+    start = Math.min(start, Math.floor(startMin / 60) * 60);
+    const endBoundary = endMin % 60 === 0 ? endMin : Math.ceil(endMin / 60) * 60;
+    end = Math.max(end, endBoundary);
+  }
+  if (typeof nowMinutes === 'number' && nowMinutes >= 0 && nowMinutes < start) {
+    start = Math.floor(nowMinutes / 60) * 60;
+  }
+  if (end > DAY_END) end = DAY_END;
+  if (end <= start) end = Math.min(DAY_END, start + 60);
+  return { start: start, end: end };
+}
+
+function nowMinutesForDay(now, viewedDate) {
+  if (!now || now.date !== viewedDate) return null;
+  return now.minutes;
+}
+
+function nowTopPx(nowMinutes, axis, hourPx) {
+  if (typeof nowMinutes !== 'number' || !axis) return null;
+  if (nowMinutes < axis.start || nowMinutes > axis.end) return null;
+  return ((nowMinutes - axis.start) / 60) * hourPx;
+}
+
+function hourLabels(axis) {
+  const labels = [];
+  for (let minute = axis.start; minute < axis.end; minute += 60) {
+    labels.push(minutesToTime(minute));
+  }
+  return labels;
+}
+
+function eventBox(startMin, endMin, axis, hourPx) {
+  const top = ((startMin - axis.start) / 60) * hourPx;
+  const height = Math.max(((endMin - startMin) / 60) * hourPx, 22);
+  return { top: top, height: height };
+}
+
+function eventDetails(height) {
+  return {
+    time: height >= 36,
+    place: height >= 54,
+    memo: height >= 76
+  };
+}
+
+function layoutLane(events) {
+  const items = (Array.isArray(events) ? events : []).map((event) => ({
+    id: event.id,
+    lane: event.lane,
+    date: event.date,
+    start: event.start,
+    end: event.end,
+    title: event.title,
+    place: event.place,
+    memo: event.memo,
+    startMin: toMinutes(event.start),
+    endMin: toMinutes(event.end)
+  })).filter((event) => event.startMin != null && event.endMin != null && event.endMin > event.startMin);
+  items.sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin || String(a.id).localeCompare(String(b.id)));
+  const columnEnds = [];
+  for (const event of items) {
+    let column = 0;
+    while (column < columnEnds.length && columnEnds[column] > event.startMin) column += 1;
+    event.col = column;
+    columnEnds[column] = event.endMin;
+  }
+  const clusters = [];
+  for (const event of items) {
+    const last = clusters[clusters.length - 1];
+    if (!last || event.startMin >= last.end) {
+      clusters.push({ end: event.endMin, items: [event] });
+    } else {
+      last.end = Math.max(last.end, event.endMin);
+      last.items.push(event);
+    }
+  }
+  for (const cluster of clusters) {
+    const columns = cluster.items.reduce((max, event) => Math.max(max, event.col + 1), 1);
+    for (const event of cluster.items) event.cols = columns;
+  }
+  return items;
+}
+
+function defaultTimes(nowMinutes) {
+  let hour = 9;
+  if (typeof nowMinutes === 'number' && nowMinutes >= 9 * 60) {
+    hour = Math.floor(nowMinutes / 60) + 1;
+  }
+  if (hour > 22) hour = 22;
+  return { start: pad2(hour) + ':00', end: pad2(hour + 1) + ':00' };
+}
+
+function dateLabel(iso) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!match) return String(iso || '');
+  const date = new Date(iso + 'T12:00:00+09:00');
+  const weekday = new Intl.DateTimeFormat('ja-JP', {
+    weekday: 'short',
+    timeZone: 'Asia/Tokyo'
+  }).format(date);
+  return String(Number(match[2])) + '/' + String(Number(match[3])) + '（' + weekday + '）';
+}
+
+function tokyoParts(date) {
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  });
+  const parts = {};
+  for (const part of formatter.formatToParts(date)) parts[part.type] = part.value;
+  let hour = parts.hour;
+  if (hour === '24') hour = '00';
+  return {
+    date: parts.year + '-' + parts.month + '-' + parts.day,
+    minutes: Number(hour) * 60 + Number(parts.minute),
+    label: hour + ':' + parts.minute
+  };
+}
+
+const state = {
+  events: [],
+  date: DATES[0],
+  editingId: '',
+  loaded: false
+};
+let listing = false;
+let failures = 0;
+let didScrollNow = false;
+const localEvents = seedEvents();
+
+function seedEvents() {
+  if (typeof window === 'undefined' || !Array.isArray(window.__SEED__)) return [];
+  return window.__SEED__.map((event) => Object.assign({}, event));
+}
+
+function currentTokyo() {
+  const forced = typeof window !== 'undefined' && window.__NOW__;
+  return tokyoParts(forced ? new Date(forced) : new Date());
+}
+
+function boot() {
+  fillSelects();
+  document.getElementById('days').addEventListener('click', onDayClick);
+  document.getElementById('add').addEventListener('click', () => openEditor(blankEvent()));
+  document.getElementById('cancel').addEventListener('click', closeEditor);
+  document.getElementById('remove').addEventListener('click', onDelete);
+  document.getElementById('editor').addEventListener('submit', onSubmit);
+  document.getElementById('lane').addEventListener('change', syncSwatch);
+  document.getElementById('board').addEventListener('click', onBoardClick);
+  document.getElementById('board').addEventListener('keydown', onBoardKey);
+  const now = currentTokyo();
+  state.date = DATES.includes(now.date) ? now.date : DATES[0];
+  renderDays();
+  refresh();
+  setInterval(refresh, 20000);
+  setInterval(renderBoard, 30000);
+}
+
+function fillSelects() {
+  const lane = document.getElementById('lane');
+  const date = document.getElementById('date');
+  const blank = document.createElement('option');
+  blank.value = '';
+  blank.textContent = '選ぶ';
+  lane.appendChild(blank);
+  for (const item of LANES) {
+    const option = document.createElement('option');
+    option.value = item.id;
+    option.textContent = item.name;
+    lane.appendChild(option);
+  }
+  for (const item of DATES) {
+    const option = document.createElement('option');
+    option.value = item;
+    option.textContent = dateLabel(item);
+    date.appendChild(option);
+  }
+}
+
+function blankEvent() {
+  const now = currentTokyo();
+  const times = defaultTimes(state.date === now.date ? now.minutes : null);
+  return {
+    id: '',
+    lane: '',
+    date: state.date,
+    start: times.start,
+    end: times.end,
+    title: '',
+    place: '',
+    memo: ''
+  };
+}
+
+function renderDays() {
+  const nav = document.getElementById('days');
+  nav.replaceChildren();
+  for (const date of DATES) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.date = date;
+    button.textContent = dateLabel(date);
+    button.setAttribute('aria-pressed', date === state.date ? 'true' : 'false');
+    nav.appendChild(button);
+  }
+  const reload = document.createElement('button');
+  reload.type = 'button';
+  reload.id = 'reload';
+  reload.className = 'text-btn';
+  reload.textContent = '再読込';
+  reload.addEventListener('click', () => { refresh(); });
+  nav.appendChild(reload);
+}
+
+function onDayClick(event) {
+  const button = event.target.closest('button');
+  if (!button || !button.dataset.date) return;
+  state.date = button.dataset.date;
+  renderDays();
+  renderBoard();
+}
+
+function renderHint(now) {
+  const hint = document.getElementById('hint');
+  if (!DATES.includes(now.date) || now.date === state.date) {
+    hint.hidden = true;
+    hint.replaceChildren();
+    return;
+  }
+  hint.hidden = false;
+  hint.replaceChildren();
+  hint.appendChild(document.createTextNode('いまは ' + dateLabel(now.date) + ' ' + now.label + ' です。'));
+  const jump = document.createElement('button');
+  jump.type = 'button';
+  jump.className = 'text-btn';
+  jump.textContent = 'この日を見る';
+  jump.addEventListener('click', () => {
+    state.date = now.date;
+    renderDays();
+    renderBoard();
+  });
+  hint.appendChild(jump);
+}
+
+function renderBoard() {
+  const now = currentTokyo();
+  const dayEvents = state.events.filter((event) => event.date === state.date);
+  const axis = axisRange(dayEvents, nowMinutesForDay(now, state.date));
+  const rows = (axis.end - axis.start) / 60;
+  const nowTop = nowTopPx(nowMinutesForDay(now, state.date), axis, HOUR_PX);
+  const board = document.getElementById('board');
+  board.replaceChildren();
+
+  const scroll = document.createElement('div');
+  scroll.className = 'board-scroll';
+  const root = document.createElement('div');
+  root.className = 'board';
+  root.style.setProperty('--hour', HOUR_PX + 'px');
+  root.style.setProperty('--rows', String(rows));
+
+  const head = document.createElement('div');
+  head.className = 'head';
+  head.appendChild(document.createElement('div')).className = 'corner';
+  for (const lane of LANES) {
+    const cell = document.createElement('div');
+    cell.className = 'lane-head ' + lane.id;
+    const swatch = document.createElement('span');
+    swatch.className = 'swatch';
+    swatch.setAttribute('aria-hidden', 'true');
+    cell.appendChild(swatch);
+    cell.appendChild(document.createTextNode(lane.name));
+    head.appendChild(cell);
+  }
+
+  const body = document.createElement('div');
+  body.className = 'body';
+  const timeCol = document.createElement('div');
+  timeCol.className = 'time-col';
+  for (const label of hourLabels(axis)) {
+    const hour = document.createElement('div');
+    hour.className = 'hour';
+    hour.textContent = label;
+    timeCol.appendChild(hour);
+  }
+  if (nowTop != null) {
+    const label = document.createElement('div');
+    label.className = 'now-label';
+    label.style.top = Math.max(0, nowTop - 8) + 'px';
+    label.textContent = now.label;
+    timeCol.appendChild(label);
+  }
+
+  const lanesWrap = document.createElement('div');
+  lanesWrap.className = 'lanes-wrap';
+  const lanes = document.createElement('div');
+  lanes.className = 'lanes';
+  for (const lane of LANES) {
+    const column = document.createElement('div');
+    column.className = 'lane';
+    const placed = layoutLane(dayEvents.filter((event) => event.lane === lane.id));
+    for (const event of placed) column.appendChild(renderEvent(event, axis));
+    lanes.appendChild(column);
+  }
+  lanesWrap.appendChild(lanes);
+  if (nowTop != null) {
+    const line = document.createElement('div');
+    line.className = 'now-line';
+    line.style.top = nowTop + 'px';
+    line.setAttribute('role', 'img');
+    line.setAttribute('aria-label', '現在時刻 ' + now.label);
+    lanesWrap.appendChild(line);
+  }
+
+  body.appendChild(timeCol);
+  body.appendChild(lanesWrap);
+  root.appendChild(head);
+  root.appendChild(body);
+  scroll.appendChild(root);
+  board.appendChild(scroll);
+
+  const empty = document.getElementById('empty');
+  empty.hidden = !(state.loaded && dayEvents.length === 0);
+  empty.textContent = empty.hidden ? '' : 'この日の予定はまだありません。';
+  renderHint(now);
+  if (nowTop != null) maybeScrollToNow();
+}
+
+function renderEvent(event, axis) {
+  const box = eventBox(event.startMin, event.endMin, axis, HOUR_PX);
+  const card = document.createElement('div');
+  card.className = 'event ' + event.lane;
+  card.dataset.id = event.id;
+  card.setAttribute('role', 'button');
+  card.tabIndex = 0;
+  const width = 100 / event.cols;
+  card.style.top = box.top + 'px';
+  card.style.height = Math.max(box.height - 2, 18) + 'px';
+  card.style.left = 'calc(' + width * event.col + '% + 2px)';
+  card.style.width = 'calc(' + width + '% - 4px)';
+
+  const title = document.createElement('span');
+  title.className = 'title';
+  title.textContent = event.title;
+  card.appendChild(title);
+  const details = eventDetails(box.height);
+  if (details.time) {
+    const time = document.createElement('span');
+    time.className = 'meta';
+    time.textContent = event.start + '–' + event.end;
+    card.appendChild(time);
+  }
+  if (details.place && event.place) {
+    const place = document.createElement('span');
+    place.className = 'meta';
+    place.textContent = event.place;
+    card.appendChild(place);
+    const link = document.createElement('a');
+    link.href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(event.place);
+    link.target = '_blank';
+    link.rel = 'nofollow noopener noreferrer';
+    link.textContent = '地図';
+    card.appendChild(link);
+  }
+  if (details.memo && event.memo) {
+    const memo = document.createElement('span');
+    memo.className = 'meta';
+    memo.textContent = event.memo;
+    card.appendChild(memo);
+  }
+  return card;
+}
+
+function maybeScrollToNow() {
+  if (didScrollNow) return;
+  const line = document.querySelector('.now-line');
+  if (!line) return;
+  didScrollNow = true;
+  line.scrollIntoView({ block: 'center' });
+}
+
+function onBoardClick(event) {
+  if (event.target.closest('a')) return;
+  openFromCard(event.target.closest('.event'));
+}
+
+function onBoardKey(event) {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  if (event.target.closest('a')) return;
+  const card = event.target.closest('.event');
+  if (!card) return;
+  event.preventDefault();
+  openFromCard(card);
+}
+
+function openFromCard(card) {
+  if (!card) return;
+  const found = state.events.find((event) => event.id === card.dataset.id);
+  if (found) openEditor(found);
+}
+
+function openEditor(event) {
+  state.editingId = event.id || '';
+  document.getElementById('editor-title').textContent = event.id ? '予定を編集' : '予定を追加';
+  document.getElementById('lane').value = event.lane || '';
+  document.getElementById('date').value = event.date;
+  document.getElementById('start').value = event.start;
+  document.getElementById('end').value = event.end;
+  document.getElementById('title').value = event.title || '';
+  document.getElementById('place').value = event.place || '';
+  document.getElementById('memo').value = event.memo || '';
+  document.getElementById('remove').hidden = !event.id;
+  document.getElementById('editor').hidden = false;
+  document.getElementById('add').hidden = true;
+  syncSwatch();
+  document.getElementById('editor').scrollIntoView({ block: 'start' });
+}
+
+function closeEditor() {
+  state.editingId = '';
+  document.getElementById('editor').hidden = true;
+  document.getElementById('add').hidden = false;
+}
+
+function syncSwatch() {
+  const lane = document.getElementById('lane').value;
+  const swatch = document.getElementById('lane-swatch');
+  swatch.className = 'swatch' + (lane ? ' ' + lane : '');
+  swatch.hidden = !lane;
+}
+
+function readForm() {
+  return {
+    id: state.editingId,
+    lane: document.getElementById('lane').value,
+    date: document.getElementById('date').value,
+    start: document.getElementById('start').value,
+    end: document.getElementById('end').value,
+    title: document.getElementById('title').value,
+    place: document.getElementById('place').value,
+    memo: document.getElementById('memo').value
+  };
+}
+
+function setStatus(text, isError) {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.classList.toggle('error', Boolean(isError));
+}
+
+function setBusy(busy) {
+  document.querySelector('#editor button[type="submit"]').disabled = busy;
+  document.getElementById('remove').disabled = busy;
+}
+
+async function onSubmit(event) {
+  event.preventDefault();
+  const cleaned = cleanEvent(readForm());
+  if (!cleaned.ok) {
+    setStatus(cleaned.error, true);
+    return;
+  }
+  setBusy(true);
+  try {
+    const res = await call('apiSave', cleaned.event);
+    if (!res || !res.ok) {
+      setStatus((res && res.error) || '保存できませんでした。', true);
+      return;
+    }
+    state.events = res.events || [];
+    state.loaded = true;
+    closeEditor();
+    renderBoard();
+    setStatus('保存しました。', false);
+  } catch (error) {
+    setStatus('保存できませんでした。通信を確認してもう一度おしてください。', true);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function onDelete() {
+  if (!state.editingId) return;
+  if (!window.confirm('この予定を削除しますか？')) return;
+  setBusy(true);
+  try {
+    const res = await call('apiDelete', state.editingId);
+    if (!res || !res.ok) {
+      setStatus((res && res.error) || '削除できませんでした。', true);
+      return;
+    }
+    state.events = res.events || [];
+    state.loaded = true;
+    closeEditor();
+    renderBoard();
+    setStatus('削除しました。', false);
+  } catch (error) {
+    setStatus('削除できませんでした。通信を確認してもう一度おしてください。', true);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function refresh() {
+  if (listing) return;
+  listing = true;
+  try {
+    const res = await call('apiList');
+    if (!res || !res.ok) throw new Error('list failed');
+    state.events = res.events || [];
+    state.loaded = true;
+    failures = 0;
+    renderBoard();
+  } catch (error) {
+    failures += 1;
+    if (failures >= 2 || !state.loaded) setStatus('読み込めませんでした。再読込を押してください。', true);
+  } finally {
+    listing = false;
+  }
+}
+
+function call(name, arg) {
+  if (typeof google !== 'undefined' && google.script && google.script.run) return gasCall(name, arg);
+  if (typeof window !== 'undefined' && window.ENDPOINT) return jsonpCall(name, arg);
+  return Promise.resolve(localCall(name, arg));
+}
+
+function gasCall(name, arg) {
+  return new Promise((resolve, reject) => {
+    const runner = google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler((error) => {
+        reject(new Error(error && error.message ? error.message : 'request failed'));
+      });
+    if (arg === undefined) runner[name]();
+    else runner[name](arg);
+  });
+}
+
+function jsonpCall(name, arg) {
+  return new Promise((resolve, reject) => {
+    const callback = 'cb_' + localId();
+    const script = document.createElement('script');
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('timeout'));
+    }, 20000);
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[callback];
+      script.remove();
+    }
+    window[callback] = (data) => {
+      cleanup();
+      resolve(data);
+    };
+    const url = new URL(window.ENDPOINT);
+    url.searchParams.set('action', name);
+    url.searchParams.set('callback', callback);
+    url.searchParams.set('t', String(Date.now()));
+    if (arg !== undefined) url.searchParams.set('payload', JSON.stringify(arg));
+    script.src = url.toString();
+    script.onerror = () => {
+      cleanup();
+      reject(new Error('request failed'));
+    };
+    document.head.appendChild(script);
+  });
+}
+
+function localCall(name, arg) {
+  if (name === 'apiList') return { ok: true, events: localEvents.map(copyEvent) };
+  if (name === 'apiSave') {
+    const cleaned = cleanEvent(arg);
+    if (!cleaned.ok) return cleaned;
+    const event = cleaned.event;
+    if (event.id) {
+      const index = localEvents.findIndex((item) => item.id === event.id);
+      if (index < 0) return { ok: false, error: 'その予定は見つかりません。再読込してもう一度開いてください。' };
+      localEvents[index] = event;
+    } else {
+      event.id = localId();
+      localEvents.push(event);
+    }
+    return { ok: true, events: localEvents.map(copyEvent) };
+  }
+  if (name === 'apiDelete') {
+    const before = localEvents.length;
+    const next = localEvents.filter((item) => item.id !== arg);
+    if (next.length === before) return { ok: false, error: 'その予定は見つかりません。再読込してもう一度開いてください。' };
+    localEvents.length = 0;
+    for (const event of next) localEvents.push(event);
+    return { ok: true, events: localEvents.map(copyEvent) };
+  }
+  return { ok: false, error: '未対応です。' };
+}
+
+function copyEvent(event) {
+  return {
+    id: event.id,
+    lane: event.lane,
+    date: event.date,
+    start: event.start,
+    end: event.end,
+    title: event.title,
+    place: event.place,
+    memo: event.memo
+  };
+}
+
+function localId() {
+  let id = '';
+  for (let i = 0; i < 32; i += 1) id += Math.floor(Math.random() * 16).toString(16);
+  return id;
+}
+
+boot();
+
+  </script>
+</body>
+</html>
